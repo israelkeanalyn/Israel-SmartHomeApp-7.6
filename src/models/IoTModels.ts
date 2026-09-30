@@ -14,6 +14,12 @@ export type SensorData = {
   lightLevel: number;
 };
 
+export type AppSettings = {
+  notifications: boolean;
+  autoConnect: boolean;
+  darkMode: boolean;
+};
+
 export const sampleDevices: Device[] = [
   {
     id: 1,
@@ -42,4 +48,10 @@ export const sampleSensors: SensorData = {
   temperature: 28,
   humidity: 65,
   lightLevel: 720,
+};
+
+export const defaultSettings: AppSettings = {
+  notifications: true,
+  autoConnect: true,
+  darkMode: false,
 };

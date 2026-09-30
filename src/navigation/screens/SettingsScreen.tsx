@@ -9,7 +9,11 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 
+import { useIoT } from '../../context/IoTContext';
+
 export default function SettingsScreen() {
+
+  const { gatewayConnected, setGatewayConnected } = useIoT();
 
   const [notifications, setNotifications] = useState(true);
   const [autoConnect, setAutoConnect] = useState(true);
