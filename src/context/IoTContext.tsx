@@ -1,219 +1,124 @@
 import React, {
   createContext,
-  useCallback,
   useContext,
-  useEffect,
   useState,
+  useEffect,
 } from 'react';
-
-import {
-  AppSettings,
-  Device,
-  SensorData,
-  defaultSettings,
-  sampleDevices,
-  sampleSensors,
-} from '../models/IoTModels';
-import {
-  connectGateway,
-  disconnectGateway,
-  getDevices,
-  getGatewayStatus,
-  getSensorData,
-  getSettings,
-  saveSettings,
-  updateDeviceStatus,
-} from '../services/IoTService';
+import { Device, SensorData } from '../models/IoTModels';
+import * as IoTService from '../services/IoTService';
 
 type IoTContextType = {
   devices: Device[];
-  sensors: SensorData;
-  settings: AppSettings;
-  gatewayConnected: boolean;
-  isLoadingDevices: boolean;
-  isRefreshingSensors: boolean;
-  isLoadingSettings: boolean;
-  isGatewayBusy: boolean;
-  deviceError: string | null;
-  sensorError: string | null;
-  settingsError: string | null;
-  loadDevices: () => Promise<void>;
-  refreshSensors: () => Promise<void>;
-  loadSettings: () => Promise<void>;
+  sensors: SensorData | null;
   toggleDevice: (id: number, value: boolean) => Promise<void>;
-  updateSetting: (key: keyof AppSettings, value: boolean) => Promise<void>;
-  setGatewayConnected: (connected: boolean) => Promise<void>;
+  gatewayConnected: boolean;
+  pendingDeviceIds: number[];
+  loading: boolean;
+  sensorsLoading: boolean;
+  devicesLoading: boolean;
+  sensorError: string | null;
+  deviceError: string | null;
+  refresh: () => void;
 };
 
 const IoTContext = createContext<IoTContextType | undefined>(undefined);
 
 export function IoTProvider({ children }: { children: React.ReactNode }) {
-  const [devices, setDevices] = useState<Device[]>(sampleDevices);
-  const [sensors, setSensors] = useState<SensorData>(sampleSensors);
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-  const [gatewayConnected, setGatewayConnectedState] = useState(true);
-  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
-  const [isRefreshingSensors, setIsRefreshingSensors] = useState(false);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
-  const [isGatewayBusy, setIsGatewayBusy] = useState(false);
-  const [deviceError, setDeviceError] = useState<string | null>(null);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [sensors, setSensors] = useState<SensorData | null>(null);
+  const [pendingDeviceIds, setPendingDeviceIds] = useState<number[]>([]);
+  const [gatewayConnected, setGatewayConnected] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [sensorsLoading, setSensorsLoading] = useState(true);
+  const [devicesLoading, setDevicesLoading] = useState(true);
   const [sensorError, setSensorError] = useState<string | null>(null);
-  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
 
-  const loadDevices = useCallback(async () => {
-    setIsLoadingDevices(true);
-    setDeviceError(null);
+  const toggleDevice = async (id: number, value: boolean) => {
+      setPendingDeviceIds((prev) => [...prev, id]);
+      setDeviceError(null);
 
-    try {
-      const data = await getDevices();
-      setDevices(data);
-    } catch (error) {
-      setDeviceError('Unable to load devices.');
-    } finally {
-      setIsLoadingDevices(false);
-    }
-  }, []);
+      try {
+          const updated = await IoTService.updateDeviceStatus(id, value);
 
-  const refreshSensors = useCallback(async () => {
-    setIsRefreshingSensors(true);
-    setSensorError(null);
+          setDevices((prev) =>
+              prev.map((d) => (d.id === id ? updated : d))
+          );
+          setGatewayConnected(true);
+      } catch (err) {
+          const device = devices.find((item) => item.id === id);
+          setDeviceError(`Unable to update ${device?.name ?? 'device'}.`);
+          setGatewayConnected(false);
+      } finally {
+          setPendingDeviceIds((prev) => prev.filter((d) => d !== id));
+      }
+  };
 
-    try {
-      const data = await getSensorData();
-      setSensors(data);
-    } catch (error) {
-      setSensorError('Unable to retrieve sensor data.');
-    } finally {
-      setIsRefreshingSensors(false);
-    }
-  }, []);
+  const loadData = async () => {
+      setLoading(true);
+      setSensorsLoading(true);
+      setDevicesLoading(true);
+      setSensorError(null);
+      setDeviceError(null);
 
-  const loadSettings = useCallback(async () => {
-    setIsLoadingSettings(true);
-    setSettingsError(null);
-
-    try {
-      const [savedSettings, connected] = await Promise.all([
-        getSettings(),
-        getGatewayStatus(),
+      const results = await Promise.allSettled([
+          IoTService.getDevices(),
+          IoTService.getSensorData(),
       ]);
-
-      setSettings(savedSettings);
-      setGatewayConnectedState(connected);
-    } catch (error) {
-      setSettingsError('Unable to load settings.');
-    } finally {
-      setIsLoadingSettings(false);
-    }
-  }, []);
-
-  const toggleDevice = useCallback(
-    async (id: number, value: boolean) => {
-      if (!gatewayConnected) {
-        setDeviceError('IoT Gateway is disconnected.');
-        return;
-      }
-
-      const selectedDevice = devices.find((device) => device.id === id);
-
-      if (!selectedDevice) {
-        return;
-      }
-
-      try {
-        await updateDeviceStatus(id, value);
-        setDevices((currentDevices) =>
-          currentDevices.map((device) =>
-            device.id === id ? { ...device, status: value } : device
-          )
-        );
-        setDeviceError(null);
-      } catch (error) {
-        setDeviceError(`Unable to update ${selectedDevice.name}.`);
-      }
-    },
-    [devices, gatewayConnected]
-  );
-
-  const updateSetting = useCallback(
-    async (key: keyof AppSettings, value: boolean) => {
-      const previousValue = settings[key];
-
-      setSettings((current) => ({ ...current, [key]: value }));
-      setSettingsError(null);
-
-      try {
-        await saveSettings({ [key]: value });
-      } catch (error) {
-        setSettings((current) => ({ ...current, [key]: previousValue }));
-        setSettingsError('Unable to save setting.');
-      }
-    },
-    [settings]
-  );
-
-  const setGatewayConnected = useCallback(async (connected: boolean) => {
-    setIsGatewayBusy(true);
-
-    try {
-      if (connected) {
-        await connectGateway();
+  
+      const [devicesResult, sensorsResult] = results;
+  
+      if (devicesResult.status === 'fulfilled') {
+          setDevices(devicesResult.value);
       } else {
-        await disconnectGateway();
+          setDeviceError('Unable to retrieve devices.');
       }
-
-      setGatewayConnectedState(connected);
-      setDeviceError(connected ? null : 'IoT Gateway is disconnected.');
-    } catch (error) {
-      setDeviceError(
-        connected
-          ? 'Unable to connect to the IoT gateway.'
-          : 'Unable to disconnect from the IoT gateway.'
-      );
-    } finally {
-      setIsGatewayBusy(false);
-    }
-  }, []);
-
+  
+      if (sensorsResult.status === 'fulfilled') {
+          setSensors(sensorsResult.value);
+      } else {
+          setSensorError('Unable to retrieve sensor data.');
+      }
+  
+      const bothFailed =
+          devicesResult.status === 'rejected' &&
+          sensorsResult.status === 'rejected';
+  
+      setGatewayConnected(!bothFailed);
+      setDevicesLoading(false);
+      setSensorsLoading(false);
+      setLoading(false);
+  };
+  
   useEffect(() => {
-    void loadDevices();
-    void refreshSensors();
-    void loadSettings();
-  }, [loadDevices, refreshSensors, loadSettings]);
+      loadData();
+  }, []);
 
   return (
-    <IoTContext.Provider
-      value={{
-        devices,
-        sensors,
-        settings,
-        gatewayConnected,
-        isLoadingDevices,
-        isRefreshingSensors,
-        isLoadingSettings,
-        isGatewayBusy,
-        deviceError,
-        sensorError,
-        settingsError,
-        loadDevices,
-        refreshSensors,
-        loadSettings,
-        toggleDevice,
-        updateSetting,
-        setGatewayConnected,
-      }}
-    >
-      {children}
-    </IoTContext.Provider>
+      <IoTContext.Provider
+          value={{
+              devices,
+              sensors,
+              toggleDevice,
+              gatewayConnected,
+              pendingDeviceIds,
+              loading,
+              sensorsLoading,
+              devicesLoading,
+              sensorError,
+              deviceError,
+              refresh: loadData,
+          }}
+      >
+          {children}
+      </IoTContext.Provider>
   );
 }
 
 export function useIoT() {
   const context = useContext(IoTContext);
-
   if (!context) {
-    throw new Error('useIoT must be used inside IoTProvider');
+      throw new Error('useIoT must be used inside IoTProvider');
   }
-
   return context;
 }

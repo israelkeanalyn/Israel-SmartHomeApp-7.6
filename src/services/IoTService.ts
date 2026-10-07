@@ -1,85 +1,62 @@
-import {
-  AppSettings,
-  Device,
-  SensorData,
-  defaultSettings,
-  sampleDevices,
-} from '../models/IoTModels';
+import { Device, SensorData } from '../models/IoTModels';
 
-const wait = (milliseconds: number) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
+type SensorReadingResponse = SensorData & {
+  lightLevel: number;
+};
 
-const randomNumber = (min: number, max: number) =>
-  Math.floor(Math.random() * (max - min + 1)) + min;
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
+async function request<T>(
+  path: string,
+  options?: RequestInit
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
 
-let savedSettings: AppSettings = { ...defaultSettings };
-let gatewayOnline = true;
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
 
-export async function getSensorData(): Promise<SensorData> {
-  await wait(900);
+    try {
+      const body = (await response.json()) as { error?: string };
+      message = body.error ?? message;
+    } catch {
+      // Keep the status-based message when the server response is not JSON.
+    }
 
-  return {
-    temperature: randomNumber(24, 31),
-    humidity: randomNumber(45, 72),
-    lightLevel: randomNumber(500, 900),
-  };
-}
-
-export async function getDevices(): Promise<Device[]> {
-  await wait(700);
-
-  return sampleDevices.map((device) => ({ ...device }));
-}
-
-export async function updateDeviceStatus(
-  id: number,
-  nextStatus: boolean
-): Promise<Device> {
-  await wait(700);
-
-  const device = sampleDevices.find((item) => item.id === id);
-
-  if (!device) {
-    throw new Error('Device not found');
+    throw new Error(message);
   }
 
+  return response.json() as Promise<T>;
+}
+
+export async function getSensorData(): Promise<SensorData> {
+  const reading = await request<SensorReadingResponse>(
+    '/sensor-readings/latest'
+  );
+
   return {
-    ...device,
-    status: nextStatus,
+    temperature: reading.temperature,
+    humidity: reading.humidity,
+    lightLevel: reading.lightLevel,
   };
 }
 
-export async function getSettings(): Promise<AppSettings> {
-  await wait(500);
-
-  return { ...savedSettings };
+export function getDevices(): Promise<Device[]> {
+  return request<Device[]>('/devices');
 }
 
-export async function saveSettings(
-  changes: Partial<AppSettings>
-): Promise<AppSettings> {
-  await wait(400);
-
-  savedSettings = { ...savedSettings, ...changes };
-
-  return { ...savedSettings };
-}
-
-export async function getGatewayStatus(): Promise<boolean> {
-  await wait(400);
-
-  return gatewayOnline;
-}
-
-export async function connectGateway(): Promise<void> {
-  await wait(1000);
-
-  gatewayOnline = true;
-}
-
-export async function disconnectGateway(): Promise<void> {
-  await wait(600);
-
-  gatewayOnline = false;
+export function updateDeviceStatus(
+  id: number,
+  status: boolean
+): Promise<Device> {
+  return request<Device>(`/devices/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
 }

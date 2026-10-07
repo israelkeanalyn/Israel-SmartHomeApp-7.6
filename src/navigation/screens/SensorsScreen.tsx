@@ -1,126 +1,201 @@
 import React from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
   View,
+  Text,
+  StyleSheet,
+  ScrollView, 
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
+import { Ionicons } from '@expo/vector-icons';
 import { useIoT } from '../../context/IoTContext';
 
 export default function SensorsScreen() {
-  const { sensors, refreshSensors, isRefreshingSensors, sensorError } = useIoT();
+
+  const { sensors, sensorsLoading, sensorError, refresh } = useIoT();
+
+  if (sensorsLoading) {
+    return (
+      <View style = {styles.centered}>
+        <ActivityIndicator size = "large"/>
+        <Text>Refreshing Sensors...</Text>
+      </View>
+    );
+  }
+
+  if (sensorError || !sensors) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{sensorError ?? 'Unable to retrieve sensor data.'}</Text>
+        <TouchableOpacity onPress={refresh} style={styles.retryButton}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Sensors</Text>
-      <Text style={styles.subtitle}>Monitor your environment</Text>
 
+      {/* Header */}
+      <Text style={styles.title}>
+        Sensors
+      </Text>
+
+      <Text style={styles.subtitle}>
+        Monitor your environment
+      </Text>
+
+      {/* Temperature */}
       <View style={styles.sensorCard}>
+
         <View style={styles.sensorHeader}>
-          <Ionicons name="thermometer-outline" size={26} />
-          <Text style={styles.sensorName}>Temperature</Text>
+
+          <Ionicons
+            name="thermometer-outline"
+            size={30}
+          />
+
+          <Text style={styles.sensorName}>
+            Temperature
+          </Text>
+
         </View>
-        <Text style={styles.sensorValue}>{sensors.temperature}°C</Text>
+
+        <Text style={styles.sensorValue}>
+          {sensors?.temperature}°C
+        </Text>
+
+        <Text style={styles.sensorDescription}>
+          Current room temperature
+        </Text>
+
       </View>
 
+      {/* Humidity */}
       <View style={styles.sensorCard}>
+
         <View style={styles.sensorHeader}>
-          <Ionicons name="water-outline" size={26} />
-          <Text style={styles.sensorName}>Humidity</Text>
+
+          <Ionicons
+            name="water-outline"
+            size={30}
+          />
+
+          <Text style={styles.sensorName}>
+            Humidity
+          </Text>
+
         </View>
-        <Text style={styles.sensorValue}>{sensors.humidity}%</Text>
+
+        <Text style={styles.sensorValue}>
+          {sensors?.humidity}%
+        </Text>
+
+        <Text style={styles.sensorDescription}>
+          Current relative humidity
+        </Text>
+
       </View>
 
+      {/* Light Level */}
       <View style={styles.sensorCard}>
+
         <View style={styles.sensorHeader}>
-          <Ionicons name="sunny-outline" size={26} />
-          <Text style={styles.sensorName}>Light Level</Text>
+
+          <Ionicons
+            name="sunny-outline"
+            size={30}
+          />
+
+          <Text style={styles.sensorName}>
+            Light Level
+          </Text>
+
         </View>
-        <Text style={styles.sensorValue}>{sensors.lightLevel} lux</Text>
+
+        <Text style={styles.sensorValue}>
+          {sensors?.lightLevel} lux
+        </Text>
+
+        <Text style={styles.sensorDescription}>
+          Current ambient light
+        </Text>
+
       </View>
 
-      <Pressable
-        style={styles.refreshButton}
-        onPress={() => {
-          void refreshSensors();
-        }}
-        disabled={isRefreshingSensors}
-      >
-        {isRefreshingSensors ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#fff" />
-            <Text style={styles.refreshText}>Refreshing sensors...</Text>
-          </View>
-        ) : (
-          <Text style={styles.refreshText}>Refresh Sensors</Text>
-        )}
-      </Pressable>
-
-      {sensorError ? <Text style={styles.errorText}>{sensorError}</Text> : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f7f7f7',
   },
+
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: 'bold',
   },
+
   subtitle: {
     fontSize: 14,
-    marginTop: 6,
-    marginBottom: 20,
-    color: '#666',
+    marginTop: 5,
+    marginBottom: 25,
   },
+
   sensorCard: {
-    padding: 18,
+    padding: 20,
     borderRadius: 15,
     backgroundColor: '#eeeeee',
     marginBottom: 15,
   },
+
   sensorHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
+
   sensorName: {
     fontSize: 17,
     fontWeight: 'bold',
-    marginLeft: 10,
   },
+
   sensorValue: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: 'bold',
-    marginTop: 18,
+    marginTop: 20,
   },
-  refreshButton: {
-    backgroundColor: '#1f6feb',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginTop: 10,
+
+  sensorDescription: {
+    fontSize: 13,
+    marginTop: 5,
   },
-  refreshText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  centered: {
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
+
   errorText: {
-    marginTop: 12,
-    color: '#c0392b',
-    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#eeeeee',
+  },
+
+  retryText: {
+    color: '#0066cc',
+    fontWeight: 'bold',
   },
 });

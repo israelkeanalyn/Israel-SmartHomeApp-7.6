@@ -1,28 +1,34 @@
 import React from 'react';
+
 import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
   View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Switch,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 
 import { useIoT } from '../../context/IoTContext';
 
 export default function DevicesScreen() {
+
   const {
     devices,
     toggleDevice,
-    isLoadingDevices,
-    deviceError,
     gatewayConnected,
+    pendingDeviceIds,
+    devicesLoading,
+    deviceError,
+    refresh,
   } = useIoT();
 
-  if (isLoadingDevices) {
+  if (devicesLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" />
         <Text style={styles.loadingText}>Loading devices...</Text>
       </View>
@@ -31,69 +37,100 @@ export default function DevicesScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Devices</Text>
-      <Text style={styles.subtitle}>Control your connected devices</Text>
 
-      {deviceError ? <Text style={styles.errorText}>{deviceError}</Text> : null}
+      <Text style={styles.title}>
+        Devices
+      </Text>
+
+      <Text style={styles.subtitle}>
+        Control your connected devices
+      </Text>
+
+      {!gatewayConnected && (
+        <Text style={styles.errorText}>IoT Gateway is disconnected.</Text>
+      )}
+      {deviceError && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{deviceError}</Text>
+          <TouchableOpacity onPress={refresh}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {devices.map((device) => (
-        <View key={device.id} style={styles.deviceCard}>
+
+        <View
+          key={device.id}
+          style={styles.deviceCard}
+        >
+
           <View style={styles.deviceInfo}>
+
             <View style={styles.iconContainer}>
-              <Ionicons name={device.icon} size={28} />
+
+              <Ionicons
+                name={device.icon}
+                size={28}
+              />
+
             </View>
 
             <View style={styles.deviceDetails}>
-              <Text style={styles.deviceName}>{device.name}</Text>
-              <Text style={styles.deviceType}>{device.type}</Text>
-              <Text style={styles.deviceState}>{device.status ? 'ON' : 'OFF'}</Text>
+
+              <Text style={styles.deviceName}>
+                {device.name}
+              </Text>
+
+              <Text style={styles.deviceType}>
+                {device.type}
+              </Text>
+
+              <Text style={styles.deviceState}>
+                {device.status ? 'ON' : 'OFF'}
+              </Text>
+
             </View>
+
           </View>
+          {pendingDeviceIds.includes(device.id) && (
+            <Text style={styles.updatingText}>Updating...</Text>
+          )}
 
           <Switch
             value={device.status}
-            disabled={!gatewayConnected}
+            disabled={!gatewayConnected || pendingDeviceIds.includes(device.id)}
             onValueChange={(value) => {
-              void toggleDevice(device.id, value);
+              toggleDevice(device.id, value);
             }}
           />
+
         </View>
+
       ))}
+
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f7f7f7',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f7f7f7',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-  },
+
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: 'bold',
   },
+
   subtitle: {
     fontSize: 14,
-    marginTop: 6,
-    marginBottom: 20,
-    color: '#666',
+    marginTop: 5,
+    marginBottom: 25,
   },
-  errorText: {
-    color: '#c0392b',
-    fontWeight: '600',
-    marginBottom: 12,
-  },
+
   deviceCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -103,11 +140,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#eeeeee',
     marginBottom: 15,
   },
+
   deviceInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+
   iconContainer: {
     width: 50,
     height: 50,
@@ -115,23 +154,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
-    backgroundColor: '#dfe9ff',
   },
+
   deviceDetails: {
     flex: 1,
   },
+
   deviceName: {
     fontSize: 16,
     fontWeight: 'bold',
   },
+
   deviceType: {
     fontSize: 13,
     marginTop: 3,
-    color: '#444',
   },
+
   deviceState: {
     fontSize: 12,
     marginTop: 5,
-    fontWeight: '600',
+  },
+  updatingText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#888',
+    marginTop: 3,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+  },
+  errorContainer: {
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#b00020',
+    marginBottom: 8,
+  },
+  retryText: {
+    color: '#0066cc',
+    fontWeight: 'bold',
   },
 });
