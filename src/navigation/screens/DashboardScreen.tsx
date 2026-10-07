@@ -1,22 +1,46 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, Switch, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useIoT } from '../../context/IoTContext';
 
-
-
 export default function DashboardScreen() {
-    // const [deviceStatus, setDeviceStatus] = useState(
-    //     devices.reduce((acc, device) => {
-    //         acc[device.id] = device.status;
-    //         return acc;
-    //     }, {} as Record<number, boolean>)
-    // );
 
-    const { devices, 
-        sensors, 
-        toggleDevice } = useIoT();
+    const {
+        devices,
+        sensors,
+        toggleDevice,
+        loading,
+        gatewayConnected,
+        refresh,
+        sensorsLoading,
+        devicesLoading,
+        sensorError,
+        deviceError,
+    } = useIoT();
 
+    if (loading || sensorsLoading || devicesLoading) {
+        return (
+            <View style={[styles.container, styles.centered]}>
+                <ActivityIndicator size="large" />
+                <Text style={{ marginTop: 12 }}>Loading dashboard...</Text>
+            </View>
+        );
+    }
+
+    if (sensorError || !sensors) {
+    return (
+        <View style={[styles.container, styles.centered]}>
+            <Text>
+            {sensorError ?? (gatewayConnected
+                    ? 'No sensor data available.'
+                : 'IoT Gateway is disconnected.')}
+            </Text>
+            <TouchableOpacity onPress={refresh} style={{ marginTop: 12 }}>
+                <Text style={{ color: 'blue' }}>Retry</Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
     return (
         <View style={styles.container}>
 
@@ -70,32 +94,17 @@ export default function DashboardScreen() {
                 Device Status
             </Text>
 
-            {/* <View style={styles.deviceCard}>
-
-                <View style={styles.deviceInfo}>
-                    <Text style={styles.deviceIcon}>
-                        💡
-                    </Text>
-
-                    <View>
-                        <Text style={styles.deviceName}>
-                            Living Room Light
-                        </Text>
-
-                        <Text style={styles.deviceType}>
-                            Smart Light
-                        </Text>
-                    </View>
+            {!gatewayConnected && (
+                <Text style={styles.errorText}>IoT Gateway is disconnected.</Text>
+            )}
+            {deviceError && (
+                <View>
+                    <Text style={styles.errorText}>{deviceError}</Text>
+                    <TouchableOpacity onPress={refresh}>
+                        <Text style={{ color: 'blue', marginBottom: 12 }}>Retry</Text>
+                    </TouchableOpacity>
                 </View>
-
-                <Text style={styles.deviceStatus}>
-                    ON
-                </Text>
-
-            </View>
-
-        </View>
-    ); */}
+            )}
 
             {devices.map((device) => (
 
@@ -128,6 +137,7 @@ export default function DashboardScreen() {
 
                     <Switch
                         value={device.status}
+                        disabled={!gatewayConnected}
                         onValueChange={(value) => {
                             toggleDevice(device.id, value);
                         }}
@@ -145,6 +155,11 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 20,
+    },
+
+    centered: {
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 
     greeting: {
@@ -227,9 +242,13 @@ const styles = StyleSheet.create({
         gap: 6,
     },
 
-    deviceState:{
+    deviceState: {
 
-    }
+    },
 
+    errorText: {
+        color: '#b00020',
+        marginBottom: 8,
+    },
 
 });

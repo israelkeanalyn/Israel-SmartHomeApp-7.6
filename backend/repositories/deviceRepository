@@ -1,0 +1,38 @@
+const db = require('./database');
+
+function findAll() {
+  return db.prepare(`
+    SELECT id, name, type, icon, status
+    FROM devices
+    ORDER BY id
+  `).all().map((device) => ({
+    ...device,
+    status: device.status === 1,
+  }));
+}
+
+function updateStatus(id, status) {
+  const result = db.prepare(
+    'UPDATE devices SET status = ? WHERE id = ?'
+  ).run(status ? 1 : 0, id);
+
+  if (result.changes === 0) {
+    return null;
+  }
+
+  return findById(id);
+}
+
+function findById(id) {
+  const device = db.prepare(`
+    SELECT id, name, type, icon, status
+    FROM devices
+    WHERE id = ?
+  `).get(id);
+
+  return device
+    ? { ...device, status: device.status === 1 }
+    : null;
+}
+
+module.exports = { findAll, findById, updateStatus };
